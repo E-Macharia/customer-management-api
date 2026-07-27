@@ -13,6 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import java.util.List;
 
 @RestController
@@ -30,8 +33,8 @@ public class CustomerController {
     @GetMapping
     @Operation(summary = "Retrieve all customers", description = "Fetches a list of all customers currently registered in the system.")
     @ApiResponse(responseCode = "200", description = "Successfully retrieved list of customers")
-    public ResponseEntity<List<CustomerResponseDTO>> getAllCustomers() {
-        List<CustomerResponseDTO> customers = customerService.getAllCustomers();
+    public ResponseEntity<Page<CustomerResponseDTO>> getAllCustomers(Pageable pageable) {
+        Page<CustomerResponseDTO> customers = customerService.getAllCustomers(pageable);
         return ResponseEntity.ok(customers);
     }
 
@@ -72,6 +75,7 @@ public class CustomerController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Delete a customer by ID", description = "Removes a customer's record permanently from the database.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Customer deleted successfully"),

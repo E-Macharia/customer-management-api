@@ -1,58 +1,73 @@
 package com.example.customer_api.security;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/**
- * JWT Token Provider (Architecture Preparation)
- * This class outlines the structure for generating, parsing, and validating JSON Web Tokens (JWT).
- * In a full production implementation, you would add a JWT library like io.jsonwebtoken:jjwt
- * to manage signature verification, claims parsing, and key generation.
- */
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
 @Component
 public class JwtTokenProvider {
 
-    private final String jwtSecret = "your-very-secure-jwt-secret-key-that-should-be-at-least-256-bits-long";
-    private final long jwtExpirationInMs = 3600000; // 1 hour
+    private static final Logger logger = LoggerFactory.getLogger(JwtTokenProvider.class);
+
+    private final SecretKey key;
+    private final long jwtExpirationInMs;
+
+    public JwtTokenProvider(
+            @Value("${app.jwt.secret}") String jwtSecret,
+            @Value("${app.jwt.expiration-ms}") long jwtExpirationInMs) {
+        this.key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        this.jwtExpirationInMs = jwtExpirationInMs;
+    }
 
     /**
-     * Generate a JWT token for a given username or user details.
+     * Generate a JWT token for a given username.
      */
     public String generateToken(String username) {
-        // Implementation Placeholder:
-        // return Jwts.builder()
-        //         .setSubject(username)
-        //         .setIssuedAt(new Date())
-        //         .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationInMs))
-        //         .signWith(SignatureAlgorithm.HS512, jwtSecret)
-        //         .compact();
-        return "mocked-jwt-token-for-" + username;
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+
+        return Jwts.builder()
+                .subject(username)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(key)
+                .compact();
     }
 
     /**
      * Extract the username from a JWT token.
      */
     public String getUsernameFromJWT(String token) {
-        // Implementation Placeholder:
-        // Claims claims = Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(token).getBody();
-        // return claims.getSubject();
-        if (token != null && token.startsWith("mocked-jwt-token-for-")) {
-            return token.substring("mocked-jwt-token-for-".length());
-        }
-        return null;
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        return claims.getSubject();
     }
 
     /**
      * Validate the authenticity and expiration of a JWT token.
      */
     public boolean validateToken(String authToken) {
-        // Implementation Placeholder:
-        // try {
-        //     Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);
-        //     return true;
-        // } catch (Exception e) {
-        //     log.error("JWT token validation failed");
-        // }
-        // return false;
-        return authToken != null && authToken.startsWith("mocked-jwt-token-for-");
+        try {
+            Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(authToken);
+            return true;
+        } catch (Exception ex) {
+            logger.error("Invalid JWT token: {}", ex.getMessage());
+        }
+        return false;
     }
 }

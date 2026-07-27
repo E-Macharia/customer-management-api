@@ -1,5 +1,6 @@
 package com.example.customer_api.security;
 
+import com.example.customer_api.service.CustomUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -7,28 +8,24 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
 
-/**
- * JWT Authentication Filter (Architecture Preparation)
- * Intercepts incoming requests to extract and validate the JWT token.
- * Since authentication is currently set to permitAll for testing, this filter executes
- * but will not block requests if no token is found.
- */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider tokenProvider;
+    private final CustomUserDetailsService userDetailsService;
 
     @Autowired
-    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider, CustomUserDetailsService userDetailsService) {
         this.tokenProvider = tokenProvider;
+        this.userDetailsService = userDetailsService;
     }
 
     @Override
@@ -39,10 +36,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
                 String username = tokenProvider.getUsernameFromJWT(jwt);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                // Construct authentication object with empty authorities for placeholder setup
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        username, null, Collections.emptyList());
+                        userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);

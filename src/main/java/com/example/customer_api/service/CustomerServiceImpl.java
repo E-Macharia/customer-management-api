@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,10 +26,9 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CustomerResponseDTO> getAllCustomers() {
-        return customerRepository.findAll().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+    public Page<CustomerResponseDTO> getAllCustomers(Pageable pageable) {
+        return customerRepository.findAll(pageable)
+                .map(this::convertToDTO);
     }
 
     @Override

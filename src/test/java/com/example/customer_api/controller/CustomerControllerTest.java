@@ -6,6 +6,7 @@ import com.example.customer_api.dto.CustomerResponseDTO;
 import com.example.customer_api.exception.CustomerNotFoundException;
 import com.example.customer_api.security.JwtAuthenticationFilter;
 import com.example.customer_api.security.JwtTokenProvider;
+import com.example.customer_api.service.CustomUserDetailsService;
 import com.example.customer_api.service.CustomerService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,6 +27,7 @@ import java.util.Arrays;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -35,6 +40,9 @@ class CustomerControllerTest {
 
     @MockitoBean
     private CustomerService customerService;
+
+    @MockitoBean
+    private CustomUserDetailsService userDetailsService;
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 
@@ -63,22 +71,25 @@ class CustomerControllerTest {
 
     @Test
     void getAllCustomers_ShouldReturnCustomersList() throws Exception {
-        when(customerService.getAllCustomers()).thenReturn(Arrays.asList(responseDTO));
+        Page<CustomerResponseDTO> page = new PageImpl<>(Arrays.asList(responseDTO));
+        when(customerService.getAllCustomers(any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/api/customers"))
+        mockMvc.perform(get("/api/customers")
+                        .with(user("user").roles("USER")))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].email").value("john.doe@example.com"));
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].email").value("john.doe@example.com"));
 
-        verify(customerService, times(1)).getAllCustomers();
+        verify(customerService, times(1)).getAllCustomers(any(Pageable.class));
     }
 
     @Test
     void getCustomerById_WhenExists_ShouldReturnCustomer() throws Exception {
         when(customerService.getCustomerById(1L)).thenReturn(responseDTO);
 
-        mockMvc.perform(get("/api/customers/1"))
+        mockMvc.perform(get("/api/customers/1")
+                        .with(user("user").roles("USER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.email").value("john.doe@example.com"));
@@ -90,7 +101,8 @@ class CustomerControllerTest {
     void getCustomerById_WhenNotExists_ShouldReturn404() throws Exception {
         when(customerService.getCustomerById(1L)).thenThrow(new CustomerNotFoundException("Customer not found"));
 
-        mockMvc.perform(get("/api/customers/1"))
+        mockMvc.perform(get("/api/customers/1")
+                        .with(user("user").roles("USER")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("Customer not found"));
@@ -103,6 +115,7 @@ class CustomerControllerTest {
         when(customerService.createCustomer(any(CustomerRequestDTO.class))).thenReturn(responseDTO);
 
         mockMvc.perform(post("/api/customers")
+                        .with(user("user").roles("USER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestDTO)))
                 .andExpect(status().isCreated())
@@ -121,6 +134,7 @@ class CustomerControllerTest {
                 .build();
 
         mockMvc.perform(post("/api/customers")
+                        .with(user("user").roles("USER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
@@ -137,6 +151,7 @@ class CustomerControllerTest {
         when(customerService.updateCustomer(eq(1L), any(CustomerRequestDTO.class))).thenReturn(responseDTO);
 
         mockMvc.perform(put("/api/customers/1")
+                        .with(user("user").roles("USER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestDTO)))
                 .andExpect(status().isOk())
@@ -149,9 +164,19 @@ class CustomerControllerTest {
     void deleteCustomer_WhenExists_ShouldReturn204() throws Exception {
         doNothing().when(customerService).deleteCustomer(1L);
 
-        mockMvc.perform(delete("/api/customers/1"))
+        mockMvc.perform(delete("/api/customers/1")
+                        .with(user("admin").roles("ADMIN")))
                 .andExpect(status().isNoContent());
 
         verify(customerService, times(1)).deleteCustomer(1L);
+    }
+
+    @Test
+    void deleteCustomer_WhenNotAdmin_ShouldReturn403() throws Exception {
+        mockMvc.perform(delete("/api/customers/1")
+                        .with(user("user").roles("USER")))
+                .andExpect(status().isForbidden());
+
+        verify(customerService, never()).deleteCustomer(anyLong());
     }
 }

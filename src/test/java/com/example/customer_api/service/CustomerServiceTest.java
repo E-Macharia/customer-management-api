@@ -66,14 +66,16 @@ class CustomerServiceTest {
 
     @Test
     void getAllCustomers_ShouldReturnList() {
-        when(customerRepository.findAll()).thenReturn(Arrays.asList(customer1, customer2));
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<Customer> page = new org.springframework.data.domain.PageImpl<>(Arrays.asList(customer1, customer2));
+        when(customerRepository.findAll(pageable)).thenReturn(page);
 
-        List<CustomerResponseDTO> result = customerService.getAllCustomers();
+        org.springframework.data.domain.Page<CustomerResponseDTO> result = customerService.getAllCustomers(pageable);
 
-        assertEquals(2, result.size());
-        assertEquals("john.doe@example.com", result.get(0).getEmail());
-        assertEquals("jane.smith@example.com", result.get(1).getEmail());
-        verify(customerRepository, times(1)).findAll();
+        assertEquals(2, result.getContent().size());
+        assertEquals("john.doe@example.com", result.getContent().get(0).getEmail());
+        assertEquals("jane.smith@example.com", result.getContent().get(1).getEmail());
+        verify(customerRepository, times(1)).findAll(pageable);
     }
 
     @Test
